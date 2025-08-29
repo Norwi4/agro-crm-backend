@@ -26,6 +26,21 @@ public class AnalyticsController {
 
     public AnalyticsController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
+    @GetMapping("/seasons")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','AGRONOMIST')")
+    @Operation(
+        summary = "Получить список доступных сезонов",
+        description = "Возвращает список всех сезонов, по которым есть данные в системе"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Список сезонов успешно получен"),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
+    })
+    public List<String> getAvailableSeasons() {
+        String sql = "SELECT DISTINCT season FROM field WHERE season IS NOT NULL ORDER BY season DESC";
+        return jdbc.queryForList(sql, String.class);
+    }
+
     @GetMapping("/kpi/cost-per-ha")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','ACCOUNTANT','AGRONOMIST')")
     @Operation(
@@ -37,17 +52,19 @@ public class AnalyticsController {
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
     })
     public List<Map<String,Object>> costPerHa(
-        @Parameter(description = "Сезон для фильтрации (опционально)") @RequestParam(required = false) String season) {
-        String sql = "SELECT f.id as field_id, f.name, COALESCE(SUM(mt.qty * m.price_per_unit),0) + " +
-                     "COALESCE((SELECT SUM(amount) FROM fuel_transaction ft WHERE ft.matched_task = t.id),0) AS cost, " +
-                     "COALESCE(SUM(wl.area_ha),0) AS area " +
+        @Parameter(description = "Сезон для фильтрации (опционально)") @RequestParam(value = "season", required = false) String season) {
+        String sql = "SELECT f.id as field_id, f.name, " +
+                     "COALESCE(SUM(mt.qty * mb.unit_price),0) + " +
+                     "COALESCE(SUM(ft.amount),0) AS cost, " +
+                     "f.area_ha AS area " +
                      "FROM field f " +
                      "LEFT JOIN task t ON t.field_id = f.id " +
                      "LEFT JOIN material_issue mt ON mt.task_id = t.id " +
                      "LEFT JOIN material_batch mb ON mb.id = mt.material_batch_id " +
                      "LEFT JOIN material m ON m.id = mb.material_id " +
+                     "LEFT JOIN fuel_transaction ft ON ft.matched_task = t.id " +
                      (season != null ? "WHERE f.season = ? " : "") +
-                     "GROUP BY f.id, f.name";
+                     "GROUP BY f.id, f.name, f.area_ha";
         return season != null ? jdbc.queryForList(sql, season) : jdbc.queryForList(sql);
     }
 

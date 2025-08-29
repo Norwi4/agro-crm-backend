@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Repository
 public class MaintenanceRepository {
@@ -29,7 +30,7 @@ public class MaintenanceRepository {
             o.setPlannedTs(rs.getObject("planned_ts", java.time.OffsetDateTime.class));
             o.setStatus(rs.getString("status"));
             o.setParts(rs.getString("parts"));
-            o.setCost(rs.getObject("cost", Double.class));
+            o.setCost(rs.getBigDecimal("cost") != null ? rs.getBigDecimal("cost").doubleValue() : null);
             return o;
         }
     };

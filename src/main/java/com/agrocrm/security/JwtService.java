@@ -22,7 +22,14 @@ public class JwtService {
     private long expirationMinutes;
 
     private Key getSigningKey() {
+        // Убеждаемся, что ключ достаточно длинный для HS512 (минимум 512 бит = 64 байта)
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 64) {
+            // Если ключ слишком короткий, дополняем его
+            byte[] paddedKey = new byte[64];
+            System.arraycopy(keyBytes, 0, paddedKey, 0, Math.min(keyBytes.length, 64));
+            return Keys.hmacShaKeyFor(paddedKey);
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 

@@ -52,7 +52,7 @@ public class MaintenanceController {
     })
     public void setStatus(
         @Parameter(description = "ID заявки") @PathVariable UUID id, 
-        @Parameter(description = "Новый статус заявки") @RequestParam String status) {
+        @Parameter(description = "Новый статус заявки") @RequestParam(value = "status") String status) {
         repo.setStatus(id, status);
     }
 
@@ -67,7 +67,7 @@ public class MaintenanceController {
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
     })
     public List<MaintenanceOrder> list(
-        @Parameter(description = "Статус для фильтрации (опционально)") @RequestParam(required = false) String status) {
+        @Parameter(description = "Статус для фильтрации (опционально)") @RequestParam(value = "status", required = false) String status) {
         return repo.list(status);
     }
 }

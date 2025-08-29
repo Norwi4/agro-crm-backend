@@ -21,11 +21,11 @@ public class MaterialBatchRepository {
             MaterialBatch b = new MaterialBatch();
             b.setId((UUID) rs.getObject("id"));
             b.setMaterialId((UUID) rs.getObject("material_id"));
-            b.setBatchNo(rs.getString("batch_no"));
-            b.setCertNo(rs.getString("cert_no"));
+            b.setBatchNo(rs.getString("batch_number"));
             b.setQty(rs.getBigDecimal("qty"));
-            b.setUnit(rs.getString("unit"));
-            java.sql.Date d = rs.getDate("expires_at");
+            b.setUnitPrice(rs.getBigDecimal("unit_price"));
+            b.setSupplier(rs.getString("supplier"));
+            java.sql.Date d = rs.getDate("expiry_date");
             b.setExpiresAt(d == null ? null : d.toLocalDate());
             return b;
         }
@@ -38,8 +38,8 @@ public class MaterialBatchRepository {
 
     public UUID create(MaterialBatch b) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO material_batch(id, material_id, batch_no, cert_no, qty, unit, expires_at) VALUES (?,?,?,?,?,?,?)",
-                id, b.getMaterialId(), b.getBatchNo(), b.getCertNo(), b.getQty(), b.getUnit(), b.getExpiresAt());
+        jdbc.update("INSERT INTO material_batch(id, material_id, batch_number, qty, unit_price, supplier, expiry_date) VALUES (?,?,?,?,?,?,?)",
+                id, b.getMaterialId(), b.getBatchNo(), b.getQty(), b.getUnitPrice(), b.getSupplier(), b.getExpiresAt());
         return id;
     }
 

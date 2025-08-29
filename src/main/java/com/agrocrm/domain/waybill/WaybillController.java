@@ -69,7 +69,7 @@ public class WaybillController {
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
     })
     public List<Waybill> list(
-        @Parameter(description = "Статус путевого листа для фильтрации") @RequestParam(required = false) String status) {
+        @Parameter(description = "Статус путевого листа для фильтрации") @RequestParam(value = "status", required = false) String status) {
         try {
             List<Waybill> waybills = repo.list(status);
             log.debug("Found {} waybills: status={}", waybills.size(), status);
@@ -91,7 +91,7 @@ public class WaybillController {
         @ApiResponse(responseCode = "404", description = "Путевой лист не найден"),
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для закрытия")
     })
-    public void close(@Parameter(description = "ID путевого листа") @PathVariable UUID id, @Valid @RequestBody Waybill w) {
+    public void close(@Parameter(description = "ID путевого листа") @PathVariable("id") UUID id, @Valid @RequestBody Waybill w) {
         try {
             repo.close(id, w);
             log.info("Closed waybill: id={}", id);
@@ -113,7 +113,7 @@ public class WaybillController {
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для скачивания"),
         @ApiResponse(responseCode = "500", description = "Ошибка генерации PDF")
     })
-    public ResponseEntity<byte[]> pdf(@Parameter(description = "ID путевого листа") @PathVariable UUID id) {
+    public ResponseEntity<byte[]> pdf(@PathVariable("id") UUID id) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Document doc = new Document();

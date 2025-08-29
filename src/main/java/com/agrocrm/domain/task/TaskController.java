@@ -63,8 +63,8 @@ public class TaskController {
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
     })
     public List<Task> list(
-        @Parameter(description = "Статус задачи для фильтрации") @RequestParam(required = false) String status,
-        @Parameter(description = "ID поля для фильтрации") @RequestParam(required = false) UUID fieldId) {
+        @Parameter(description = "Статус задачи для фильтрации") @RequestParam(value = "status", required = false) String status,
+        @Parameter(description = "ID поля для фильтрации") @RequestParam(value = "fieldId", required = false) UUID fieldId) {
         try {
             return service.find(status, fieldId);
         } catch (Exception e) {

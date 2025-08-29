@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Repository
 public class WaybillRepository {
@@ -27,15 +28,15 @@ public class WaybillRepository {
             w.setTaskId((UUID) rs.getObject("task_id"));
             w.setDriverId((UUID) rs.getObject("driver_id"));
             w.setMachineId((UUID) rs.getObject("machine_id"));
-            w.setRoute(rs.getString("route"));
+            w.setRoute(rs.getString("route_text"));
             w.setStartTs(rs.getObject("start_ts", java.time.OffsetDateTime.class));
             w.setEndTs(rs.getObject("end_ts", java.time.OffsetDateTime.class));
-            w.setOdometerStart(rs.getObject("odometer_start", Double.class));
-            w.setOdometerEnd(rs.getObject("odometer_end", Double.class));
-            w.setEngineHoursStart(rs.getObject("engine_hours_start", Double.class));
-            w.setEngineHoursEnd(rs.getObject("engine_hours_end", Double.class));
-            w.setFuelStart(rs.getObject("fuel_start", Double.class));
-            w.setFuelEnd(rs.getObject("fuel_end", Double.class));
+            w.setOdometerStart(rs.getBigDecimal("odometer_start") != null ? rs.getBigDecimal("odometer_start").doubleValue() : null);
+            w.setOdometerEnd(rs.getBigDecimal("odometer_end") != null ? rs.getBigDecimal("odometer_end").doubleValue() : null);
+            w.setEngineHoursStart(rs.getBigDecimal("engine_hours_start") != null ? rs.getBigDecimal("engine_hours_start").doubleValue() : null);
+            w.setEngineHoursEnd(rs.getBigDecimal("engine_hours_end") != null ? rs.getBigDecimal("engine_hours_end").doubleValue() : null);
+            w.setFuelStart(rs.getBigDecimal("fuel_start") != null ? rs.getBigDecimal("fuel_start").doubleValue() : null);
+            w.setFuelEnd(rs.getBigDecimal("fuel_end") != null ? rs.getBigDecimal("fuel_end").doubleValue() : null);
             w.setPdfPath(rs.getString("pdf_path"));
             w.setStatus(rs.getString("status"));
             return w;
@@ -78,7 +79,7 @@ public class WaybillRepository {
 
     public List<Waybill> list(String status) {
         try {
-            String sql = "SELECT *, route::text as route FROM waybill " + (status != null ? "WHERE status=?" : "") + " ORDER BY created_at DESC";
+            String sql = "SELECT *, route::text as route_text FROM waybill " + (status != null ? "WHERE status=?" : "") + " ORDER BY created_at DESC";
             List<Waybill> waybills = status != null ? jdbc.query(sql, mapper, status) : jdbc.query(sql, mapper);
             log.debug("Found {} waybills: status={}", waybills.size(), status);
             return waybills;
