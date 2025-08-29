@@ -33,12 +33,12 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String username, String role) {
+    public String generateToken(String username, String role, String sessionId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(expirationMinutes * 60);
         return Jwts.builder()
                 .setSubject(username)
-                .addClaims(Map.of("role", role))
+                .addClaims(Map.of("role", role, "sessionId", sessionId))
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)

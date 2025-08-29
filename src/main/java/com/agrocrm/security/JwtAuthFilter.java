@@ -1,5 +1,7 @@
 package com.agrocrm.security;
 
+import com.agrocrm.domain.session.SessionService;
+import com.agrocrm.domain.session.UserSession;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,9 +24,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     private final JwtService jwtService;
+    private final SessionService sessionService;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, SessionService sessionService) {
         this.jwtService = jwtService;
+        this.sessionService = sessionService;
     }
 
     @Override
@@ -35,13 +39,27 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (auth != null && auth.startsWith("Bearer ")) {
             String token = auth.substring(7);
             try {
+                // Проверяем JWT токен
                 Claims claims = jwtService.parse(token);
                 String username = claims.getSubject();
                 String role = claims.get("role", String.class);
+                
                 if (username != null && role != null) {
-                    var authToken = new UsernamePasswordAuthenticationToken(
-                            username, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // Получаем ID сессии из JWT
+                    String sessionId = claims.get("sessionId", String.class);
+                    if (sessionId != null) {
+                        // Проверяем сессию в базе данных
+                        UserSession session = sessionService.validateSessionById(sessionId);
+                        if (session != null) {
+                            var authToken = new UsernamePasswordAuthenticationToken(
+                                    username, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                            SecurityContextHolder.getContext().setAuthentication(authToken);
+                        } else {
+                            log.debug("Session not found or expired for sessionId: {}", sessionId);
+                        }
+                    } else {
+                        log.debug("No sessionId found in JWT token");
+                    }
                 }
             } catch (Exception e) {
                 log.debug("JWT token validation failed: {}", e.getMessage());
