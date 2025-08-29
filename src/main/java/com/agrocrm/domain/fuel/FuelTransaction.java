@@ -2,19 +2,44 @@ package com.agrocrm.domain.fuel;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.media.Schema;
 
+@Schema(description = "Топливная транзакция")
 public class FuelTransaction {
+    @Schema(description = "Уникальный идентификатор транзакции")
     private UUID id;
+    
+    @Schema(description = "Номер топливной карты", example = "CARD-123456")
     private String cardNumber;
+    
+    @Schema(description = "Регистрационный номер техники", example = "А123БВ77")
     private String vehicleReg;
+    
+    @Schema(description = "Количество литров", example = "50.0")
     private double liters;
+    
+    @Schema(description = "Цена за литр", example = "45.50")
     private Double price;
+    
+    @Schema(description = "Общая сумма", example = "2275.0")
     private Double amount;
+    
+    @Schema(description = "Время транзакции")
     private OffsetDateTime ts;
+    
+    @Schema(description = "Место заправки", example = "АЗС №1")
     private String location;
+    
+    @Schema(description = "Источник данных", example = "1C", allowableValues = {"1C", "TELEMATICS", "MANUAL"})
     private String source;
+    
+    @Schema(description = "ID связанной задачи")
     private UUID matchedTask;
+    
+    @Schema(description = "Аномалии в транзакции")
     private String anomalies;
+    
+    @Schema(description = "Исходные данные транзакции")
     private String raw;
 
     public UUID getId() { return id; }
