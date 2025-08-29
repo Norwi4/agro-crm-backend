@@ -1,7 +1,10 @@
 version: '3.8'
+
 services:
+  # База данных PostgreSQL
   postgres:
-    image: postgres:16
+    image: postgres:17.6-alpine
+    container_name: agrocrm-postgres
     environment:
       POSTGRES_DB: agrocrm
       POSTGRES_USER: postgres
@@ -9,6 +12,34 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot приложение
+  app:
+    build: .
+    container_name: agrocrm-app
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=jdbc:postgresql://postgres:5432/agrocrm
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - JWT_SECRET=change-me-super-secret-please-change
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
-  pgdata: {}
+  postgres_data:
