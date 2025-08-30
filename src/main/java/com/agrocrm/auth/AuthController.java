@@ -1,5 +1,6 @@
 package com.agrocrm.auth;
 
+import com.agrocrm.config.AuditService;
 import com.agrocrm.domain.session.SessionService;
 import com.agrocrm.domain.session.UserSession;
 import com.agrocrm.security.JwtService;
@@ -37,15 +38,17 @@ public class AuthController {
     private final SessionService sessionService;
     private final CustomUserDetailsService userDetailsService;
     private final JdbcTemplate jdbc;
+    private final AuditService auditService;
 
     public AuthController(AuthenticationManager authenticationManager, JwtService jwtService, 
                          SessionService sessionService, CustomUserDetailsService userDetailsService,
-                         JdbcTemplate jdbc) {
+                         JdbcTemplate jdbc, AuditService auditService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.sessionService = sessionService;
         this.userDetailsService = userDetailsService;
         this.jdbc = jdbc;
+        this.auditService = auditService;
     }
 
     @PostMapping("/login")
@@ -95,6 +98,9 @@ public class AuthController {
             
             // Обновляем сессию с refresh токеном
             sessionService.updateSessionToken(session.getId(), refreshToken);
+            
+            // Логируем успешный вход
+            auditService.logUserAction(userId, "LOGIN", "USER", userId.toString(), ipAddress, userAgent);
             
             log.info("User logged in successfully: username={}, role={}, sessionId={}", 
                     request.getUsername(), role, session.getId());
@@ -218,6 +224,9 @@ public class AuthController {
             String ipAddress = getClientIpAddress(request);
             sessionService.logout(UUID.fromString(sessionId), userId, ipAddress, userAgent);
             
+            // Логируем выход
+            auditService.logUserAction(userId, "LOGOUT", "SESSION", sessionId, ipAddress, userAgent);
+            
             log.info("User logged out: username={}, sessionId={}", username, sessionId);
             
             return ResponseEntity.ok().build();
@@ -269,6 +278,9 @@ public class AuthController {
             String userAgent = request.getHeader("User-Agent");
             String ipAddress = getClientIpAddress(request);
             sessionService.terminateAllOtherSessions(UUID.fromString(sessionId), userId, ipAddress, userAgent);
+            
+            // Логируем выход со всех устройств
+            auditService.logUserAction(userId, "LOGOUT_ALL", "USER", userId.toString(), ipAddress, userAgent);
             
             log.info("User logged out from all devices: username={}, currentSessionId={}", username, sessionId);
             

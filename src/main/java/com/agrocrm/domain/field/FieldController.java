@@ -1,5 +1,6 @@
 package com.agrocrm.domain.field;
 
+import com.agrocrm.config.AuditService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +27,12 @@ public class FieldController {
 
     private final FieldService service;
     private final SecurityUtil sec;
+    private final AuditService auditService;
 
-    public FieldController(FieldService service, SecurityUtil sec) {
+    public FieldController(FieldService service, SecurityUtil sec, AuditService auditService) {
         this.service = service;
         this.sec = sec;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -87,6 +90,10 @@ public class FieldController {
         try {
             UUID userId = sec.currentUserIdOrNull(); // TODO: resolve from auth principal
             UUID id = service.create(f, userId);
+            
+            // Логируем создание поля
+            auditService.log(userId, "CREATE", "FIELD", id.toString());
+            
             log.info("Created field: id={}, name={}, creator={}", id, f.getName(), userId);
             return Map.of("id", id);
         } catch (Exception e) {
@@ -110,6 +117,11 @@ public class FieldController {
     public void update(@Parameter(description = "ID поля") @PathVariable UUID id, @Valid @RequestBody Field f) {
         try {
             service.update(id, f);
+            
+            // Логируем обновление поля
+            UUID currentUserId = sec.currentUserIdOrNull();
+            auditService.log(currentUserId, "UPDATE", "FIELD", id.toString());
+            
             log.info("Updated field: id={}, name={}", id, f.getName());
         } catch (Exception e) {
             log.error("Failed to update field: id={}, name={}", id, f.getName(), e);
@@ -131,6 +143,11 @@ public class FieldController {
     public void delete(@Parameter(description = "ID поля") @PathVariable UUID id) {
         try {
             service.delete(id);
+            
+            // Логируем удаление поля
+            UUID currentUserId = sec.currentUserIdOrNull();
+            auditService.log(currentUserId, "DELETE", "FIELD", id.toString());
+            
             log.info("Deleted field: id={}", id);
         } catch (Exception e) {
             log.error("Failed to delete field: id={}", id, e);

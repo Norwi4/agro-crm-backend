@@ -1,5 +1,6 @@
 package com.agrocrm.domain.session;
 
+import com.agrocrm.config.AuditService;
 import com.agrocrm.security.JwtService;
 import io.jsonwebtoken.Claims;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,11 +30,13 @@ public class SessionController {
     private final SessionService sessionService;
     private final JwtService jwtService;
     private final JdbcTemplate jdbc;
+    private final AuditService auditService;
 
-    public SessionController(SessionService sessionService, JwtService jwtService, JdbcTemplate jdbc) {
+    public SessionController(SessionService sessionService, JwtService jwtService, JdbcTemplate jdbc, AuditService auditService) {
         this.sessionService = sessionService;
         this.jwtService = jwtService;
         this.jdbc = jdbc;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -132,6 +135,9 @@ public class SessionController {
             String userAgent = request.getHeader("User-Agent");
             String ipAddress = getClientIpAddress(request);
             sessionService.terminateSession(UUID.fromString(sessionId), userId, ipAddress, userAgent);
+            
+            // Логируем завершение сессии
+            auditService.logUserAction(userId, "TERMINATE_SESSION", "SESSION", sessionId, ipAddress, userAgent);
             
             log.info("Session terminated: username={}, sessionId={}", username, sessionId);
             
