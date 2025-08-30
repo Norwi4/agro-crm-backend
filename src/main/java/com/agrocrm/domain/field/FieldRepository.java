@@ -47,6 +47,30 @@ public class FieldRepository {
             throw e;
         }
     }
+    
+    public List<Field> findAllPaginated(int page, int size) {
+        try {
+            int offset = page * size;
+            String sql = "SELECT id, name, area_ha, crop, season, soil_type, geojson::text FROM field ORDER BY name LIMIT ? OFFSET ?";
+            List<Field> fields = jdbc.query(sql, mapper, size, offset);
+            log.debug("Found {} fields for page {} with size {}", fields.size(), page, size);
+            return fields;
+        } catch (Exception e) {
+            log.error("Failed to find fields with pagination: page={}, size={}", page, size, e);
+            throw e;
+        }
+    }
+    
+    public long countAll() {
+        try {
+            Long count = jdbc.queryForObject("SELECT COUNT(*) FROM field", Long.class);
+            log.debug("Total fields count: {}", count);
+            return count != null ? count : 0;
+        } catch (Exception e) {
+            log.error("Failed to count fields", e);
+            throw e;
+        }
+    }
 
     public Field findById(UUID id) {
         try {

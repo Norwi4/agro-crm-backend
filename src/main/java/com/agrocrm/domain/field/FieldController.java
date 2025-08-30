@@ -39,18 +39,31 @@ public class FieldController {
     @PreAuthorize("hasAnyRole('ADMIN','AGRONOMIST','MANAGER')")
     @Operation(
         summary = "Получить список всех полей",
-        description = "Возвращает список всех сельскохозяйственных полей в системе"
+        description = "Возвращает пагинированный список всех сельскохозяйственных полей в системе"
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Список полей успешно получен"),
         @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа"),
         @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера")
     })
-    public List<Field> list() { 
+    public PageableFieldResponse list(
+            @Parameter(description = "Номер страницы (начиная с 0)", example = "0") 
+            @RequestParam(defaultValue = "0") int page,
+            
+            @Parameter(description = "Размер страницы", example = "10") 
+            @RequestParam(defaultValue = "10") int size) { 
         try {
-            return service.list();
+            // Валидация параметров
+            if (page < 0) {
+                page = 0;
+            }
+            if (size < 1 || size > 100) {
+                size = 10;
+            }
+            
+            return service.listPaginated(page, size);
         } catch (Exception e) {
-            log.error("Failed to list fields", e);
+            log.error("Failed to list fields with pagination: page={}, size={}", page, size, e);
             throw e;
         }
     }
