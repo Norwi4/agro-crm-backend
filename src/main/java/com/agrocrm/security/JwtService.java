@@ -48,6 +48,18 @@ public class JwtService {
                 .compact();
     }
 
+    public String generateAccessToken(String username, java.util.List<String> roles, String sessionId) {
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(accessTokenExpirationMinutes * 60);
+        return Jwts.builder()
+                .setSubject(username)
+                .addClaims(Map.of("roles", roles, "sessionId", sessionId, "type", "access"))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .compact();
+    }
+
     public String generateRefreshToken(String username, String sessionId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(refreshTokenExpirationDays * 24 * 60 * 60);

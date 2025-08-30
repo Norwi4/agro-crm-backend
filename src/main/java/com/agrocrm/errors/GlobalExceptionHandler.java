@@ -1,5 +1,13 @@
 package com.agrocrm.errors;
 
+import com.agrocrm.domain.document.PersonalDocumentNotFoundException;
+import com.agrocrm.domain.document.PersonalDocumentAlreadyExistsException;
+import com.agrocrm.domain.document.CompanyDocumentNotFoundException;
+import com.agrocrm.domain.role.RoleNotFoundException;
+import com.agrocrm.domain.role.RoleAlreadyExistsException;
+import com.agrocrm.domain.role.UserRoleNotFoundException;
+import com.agrocrm.domain.role.UserRoleAlreadyExistsException;
+import com.agrocrm.domain.user.UserProfileNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -36,6 +44,80 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
             "error", "db_error", 
             "message", "Database operation failed"
+        ));
+    }
+
+    @ExceptionHandler(UserProfileNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserProfileNotFound(UserProfileNotFoundException ex) {
+        log.warn("User profile not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "user_profile_not_found", 
+            "message", ex.getMessage()
+        ));
+    }
+
+
+
+    @ExceptionHandler(PersonalDocumentNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePersonalDocumentNotFound(PersonalDocumentNotFoundException ex) {
+        log.warn("Personal document not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "personal_document_not_found", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(PersonalDocumentAlreadyExistsException.class)
+    public ResponseEntity<Map<String, Object>> handlePersonalDocumentAlreadyExists(PersonalDocumentAlreadyExistsException ex) {
+        log.warn("Personal document already exists: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "personal_document_already_exists", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(CompanyDocumentNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleCompanyDocumentNotFound(CompanyDocumentNotFoundException ex) {
+        log.warn("Company document not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "company_document_not_found", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(RoleNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleRoleNotFound(RoleNotFoundException ex) {
+        log.warn("Role not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "role_not_found", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(RoleAlreadyExistsException.class)
+    public ResponseEntity<Map<String, Object>> handleRoleAlreadyExists(RoleAlreadyExistsException ex) {
+        log.warn("Role already exists: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "role_already_exists", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(UserRoleNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserRoleNotFound(UserRoleNotFoundException ex) {
+        log.warn("User role not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+            "error", "user_role_not_found", 
+            "message", ex.getMessage()
+        ));
+    }
+
+    @ExceptionHandler(UserRoleAlreadyExistsException.class)
+    public ResponseEntity<Map<String, Object>> handleUserRoleAlreadyExists(UserRoleAlreadyExistsException ex) {
+        log.warn("User role already exists: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error", "user_role_already_exists", 
+            "message", ex.getMessage()
         ));
     }
 

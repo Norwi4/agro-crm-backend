@@ -78,8 +78,14 @@ public class AuthController {
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
             
-            String role = auth.getAuthorities().stream().map(GrantedAuthority::getAuthority).findFirst().orElse("ROLE_USER");
-            if (role.startsWith("ROLE_")) role = role.substring(5);
+            // Получаем все роли пользователя
+            java.util.List<String> roles = auth.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .map(authority -> authority.startsWith("ROLE_") ? authority.substring(5) : authority)
+                    .toList();
+            
+            // Для обратной совместимости берем первую роль как основную
+            String primaryRole = roles.isEmpty() ? "USER" : roles.get(0);
             
             // Получаем ID пользователя из базы данных
             UUID userId = getUserIdByUsername(request.getUsername());
@@ -92,8 +98,8 @@ public class AuthController {
             String ipAddress = getClientIpAddress(httpRequest);
             UserSession session = sessionService.createSession(userId, tempToken, userAgent, ipAddress);
             
-            // Генерируем access и refresh токены
-            String accessToken = jwtService.generateAccessToken(request.getUsername(), role, session.getId().toString());
+            // Генерируем access и refresh токены с множественными ролями
+            String accessToken = jwtService.generateAccessToken(request.getUsername(), roles, session.getId().toString());
             String refreshToken = jwtService.generateRefreshToken(request.getUsername(), session.getId().toString());
             
             // Обновляем сессию с refresh токеном
@@ -102,10 +108,10 @@ public class AuthController {
             // Логируем успешный вход
             auditService.logUserAction(userId, "LOGIN", "USER", userId.toString(), ipAddress, userAgent);
             
-            log.info("User logged in successfully: username={}, role={}, sessionId={}", 
-                    request.getUsername(), role, session.getId());
+            log.info("User logged in successfully: username={}, roles={}, sessionId={}", 
+                    request.getUsername(), roles, session.getId());
             
-            return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, role, request.getUsername()));
+            return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, primaryRole, request.getUsername(), roles));
         } catch (Exception e) {
             log.warn("Login failed: username={}", request.getUsername(), e);
             throw e;
@@ -159,14 +165,16 @@ public class AuthController {
 
             // Получаем информацию о пользователе
             var userDetails = userDetailsService.loadUserByUsername(username);
-            String role = userDetails.getAuthorities().stream()
+            java.util.List<String> roles = userDetails.getAuthorities().stream()
                     .map(authority -> authority.getAuthority())
-                    .findFirst()
-                    .orElse("ROLE_USER");
-            if (role.startsWith("ROLE_")) role = role.substring(5);
+                    .map(authority -> authority.startsWith("ROLE_") ? authority.substring(5) : authority)
+                    .toList();
+            
+            // Для обратной совместимости берем первую роль как основную
+            String primaryRole = roles.isEmpty() ? "USER" : roles.get(0);
 
-            // Генерируем новые токены
-            String newAccessToken = jwtService.generateAccessToken(username, role, sessionId);
+            // Генерируем новые токены с множественными ролями
+            String newAccessToken = jwtService.generateAccessToken(username, roles, sessionId);
             String newRefreshToken = jwtService.generateRefreshToken(username, sessionId);
 
             // Обновляем сессию с новым refresh токеном
@@ -174,7 +182,7 @@ public class AuthController {
 
             log.info("Token refreshed successfully: username={}, sessionId={}", username, sessionId);
 
-            return ResponseEntity.ok(new AuthResponse(newAccessToken, newRefreshToken, role, username));
+            return ResponseEntity.ok(new AuthResponse(newAccessToken, newRefreshToken, primaryRole, username, roles));
         } catch (Exception e) {
             log.warn("Token refresh failed", e);
             return ResponseEntity.status(401).build();

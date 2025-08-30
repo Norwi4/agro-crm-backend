@@ -49,17 +49,37 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 // Проверяем JWT токен
                 Claims claims = jwtService.parse(token);
                 String username = claims.getSubject();
-                String role = claims.get("role", String.class);
                 
-                if (username != null && role != null) {
+                // Поддержка как старого формата (одна роль), так и нового (множественные роли)
+                List<String> roles;
+                if (claims.get("roles") != null) {
+                    // Новый формат: массив ролей
+                    @SuppressWarnings("unchecked")
+                    List<String> rolesList = claims.get("roles", List.class);
+                    roles = rolesList;
+                } else if (claims.get("role") != null) {
+                    // Старый формат: одна роль
+                    String role = claims.get("role", String.class);
+                    roles = List.of(role);
+                } else {
+                    log.debug("No roles found in JWT token");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                
+                if (username != null && !roles.isEmpty()) {
                     // Получаем ID сессии из JWT
                     String sessionId = claims.get("sessionId", String.class);
                     if (sessionId != null) {
                         // Проверяем сессию в базе данных
                         UserSession session = sessionService.validateSessionById(sessionId);
                         if (session != null) {
-                            var authToken = new UsernamePasswordAuthenticationToken(
-                                    username, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                            // Создаем список авторитетов из ролей
+                            List<SimpleGrantedAuthority> authorities = roles.stream()
+                                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                                    .toList();
+                            
+                            var authToken = new UsernamePasswordAuthenticationToken(username, null, authorities);
                             SecurityContextHolder.getContext().setAuthentication(authToken);
                         } else {
                             log.debug("Session not found or expired for sessionId: {}", sessionId);

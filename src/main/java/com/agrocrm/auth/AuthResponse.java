@@ -10,11 +10,14 @@ public class AuthResponse {
     @Schema(description = "Refresh JWT токен для обновления access токена", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
     private String refreshToken;
     
-    @Schema(description = "Роль пользователя", example = "ADMIN")
+    @Schema(description = "Основная роль пользователя", example = "ADMIN")
     private String role;
     
     @Schema(description = "Имя пользователя", example = "admin")
     private String username;
+    
+    @Schema(description = "Все роли пользователя", example = "[\"ADMIN\", \"MANAGER\", \"AGRONOM\"]")
+    private java.util.List<String> roles;
 
     public AuthResponse() {}
 
@@ -23,6 +26,15 @@ public class AuthResponse {
         this.refreshToken = refreshToken;
         this.role = role;
         this.username = username;
+        this.roles = java.util.List.of(role);
+    }
+    
+    public AuthResponse(String accessToken, String refreshToken, String role, String username, java.util.List<String> roles) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+        this.role = role;
+        this.username = username;
+        this.roles = roles;
     }
 
     public String getAccessToken() { return accessToken; }
@@ -35,4 +47,6 @@ public class AuthResponse {
     public void setRole(String role) { this.role = role; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+    public java.util.List<String> getRoles() { return roles; }
+    public void setRoles(java.util.List<String> roles) { this.roles = roles; }
 }

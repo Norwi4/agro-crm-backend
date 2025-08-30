@@ -21,11 +21,25 @@ public class AuditService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public void log(UUID userId, String action, String entity, String entityId, String detailsJson) {
+    public void log(UUID userId, String action, String entity, String entityId, String detailsText) {
         try {
-            String safeDetailsJson = detailsJson != null ? detailsJson : "{}";
+            // Если detailsText - это обычная строка, создаем JSON объект с полем "message"
+            String detailsJson;
+            if (detailsText != null && !detailsText.trim().isEmpty()) {
+                // Проверяем, является ли строка валидным JSON
+                try {
+                    objectMapper.readTree(detailsText);
+                    detailsJson = detailsText; // Уже валидный JSON
+                } catch (Exception e) {
+                    // Не валидный JSON, создаем объект с полем "message"
+                    detailsJson = objectMapper.writeValueAsString(Map.of("message", detailsText));
+                }
+            } else {
+                detailsJson = "{}";
+            }
+            
             jdbc.update("INSERT INTO audit_log(user_id, action, entity, entity_id, details) VALUES (?,?,?,?, to_jsonb(?::json))",
-                    userId, action, entity, entityId, safeDetailsJson);
+                    userId, action, entity, entityId, detailsJson);
         } catch (Exception e) {
             log.error("Failed to log audit event: userId={}, action={}, entity={}, entityId={}", 
                      userId, action, entity, entityId, e);
