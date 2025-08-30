@@ -27,8 +27,8 @@ public class SessionService {
             // Определяем тип устройства на основе User-Agent
             Map<String, Object> deviceInfo = parseDeviceInfo(userAgent);
             
-            // Устанавливаем время истечения (12 часов)
-            OffsetDateTime expiresAt = OffsetDateTime.now().plusHours(12);
+            // Устанавливаем время истечения (30 дней для refresh токена)
+            OffsetDateTime expiresAt = OffsetDateTime.now().plusDays(30);
             
             UserSession session = new UserSession(userId, sessionToken, deviceInfo, ipAddress, userAgent, expiresAt);
             UUID sessionId = sessionRepository.createSession(session);
@@ -84,6 +84,16 @@ public class SessionService {
         } catch (Exception e) {
             log.error("Failed to validate session by ID: sessionId={}", sessionId, e);
             return null;
+        }
+    }
+
+    public boolean isSessionActive(UUID sessionId) {
+        try {
+            UserSession session = sessionRepository.findById(sessionId);
+            return session != null && session.getIsActive() && session.getExpiresAt().isAfter(OffsetDateTime.now());
+        } catch (Exception e) {
+            log.error("Failed to check session active status: sessionId={}", sessionId, e);
+            return false;
         }
     }
 

@@ -39,6 +39,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (auth != null && auth.startsWith("Bearer ")) {
             String token = auth.substring(7);
             try {
+                // Проверяем, что это access токен
+                if (!jwtService.isAccessToken(token)) {
+                    log.debug("Token is not an access token");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                
                 // Проверяем JWT токен
                 Claims claims = jwtService.parse(token);
                 String username = claims.getSubject();

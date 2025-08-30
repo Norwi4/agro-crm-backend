@@ -18,8 +18,11 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String secret;
 
-    @Value("${app.jwt.expirationMinutes:720}")
-    private long expirationMinutes;
+    @Value("${app.jwt.accessTokenExpirationMinutes:30}")
+    private long accessTokenExpirationMinutes;
+
+    @Value("${app.jwt.refreshTokenExpirationDays:30}")
+    private long refreshTokenExpirationDays;
 
     private Key getSigningKey() {
         // Убеждаемся, что ключ достаточно длинный для HS512 (минимум 512 бит = 64 байта)
@@ -33,12 +36,24 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String username, String role, String sessionId) {
+    public String generateAccessToken(String username, String role, String sessionId) {
         Instant now = Instant.now();
-        Instant exp = now.plusSeconds(expirationMinutes * 60);
+        Instant exp = now.plusSeconds(accessTokenExpirationMinutes * 60);
         return Jwts.builder()
                 .setSubject(username)
-                .addClaims(Map.of("role", role, "sessionId", sessionId))
+                .addClaims(Map.of("role", role, "sessionId", sessionId, "type", "access"))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    public String generateRefreshToken(String username, String sessionId) {
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(refreshTokenExpirationDays * 24 * 60 * 60);
+        return Jwts.builder()
+                .setSubject(username)
+                .addClaims(Map.of("sessionId", sessionId, "type", "refresh"))
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
@@ -51,5 +66,32 @@ public class JwtService {
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    public boolean isTokenExpired(String token) {
+        try {
+            Claims claims = parse(token);
+            return claims.getExpiration().before(new Date());
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            Claims claims = parse(token);
+            return "refresh".equals(claims.get("type"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isAccessToken(String token) {
+        try {
+            Claims claims = parse(token);
+            return "access".equals(claims.get("type"));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

@@ -16,4 +16,5 @@ server:
 app:
   jwt:
     secret: ${JWT_SECRET:change-me-super-secret-please-change-this-is-a-very-long-secret-key-for-hs512-algorithm-that-must-be-at-least-512-bits-long}
-    expirationMinutes: 720 # 12 часов
+    accessTokenExpirationMinutes: 30 # 30 минут для access token
+    refreshTokenExpirationDays: 30 # 30 дней для refresh token

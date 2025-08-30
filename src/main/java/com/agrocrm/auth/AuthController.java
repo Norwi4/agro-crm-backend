@@ -89,19 +89,193 @@ public class AuthController {
             String ipAddress = getClientIpAddress(httpRequest);
             UserSession session = sessionService.createSession(userId, tempToken, userAgent, ipAddress);
             
-            // Генерируем JWT токен с правильным ID сессии
-            String token = jwtService.generateToken(request.getUsername(), role, session.getId().toString());
+            // Генерируем access и refresh токены
+            String accessToken = jwtService.generateAccessToken(request.getUsername(), role, session.getId().toString());
+            String refreshToken = jwtService.generateRefreshToken(request.getUsername(), session.getId().toString());
             
-            // Обновляем сессию с JWT токеном
-            sessionService.updateSessionToken(session.getId(), token);
+            // Обновляем сессию с refresh токеном
+            sessionService.updateSessionToken(session.getId(), refreshToken);
             
             log.info("User logged in successfully: username={}, role={}, sessionId={}", 
                     request.getUsername(), role, session.getId());
             
-            return ResponseEntity.ok(new AuthResponse(token, role, request.getUsername()));
+            return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, role, request.getUsername()));
         } catch (Exception e) {
             log.warn("Login failed: username={}", request.getUsername(), e);
             throw e;
+        }
+    }
+
+    @PostMapping("/refresh")
+    @Operation(
+        summary = "Обновление access токена",
+        description = "Обновление access токена с помощью refresh токена"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Токен успешно обновлен",
+            content = @Content(schema = @Schema(implementation = AuthResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "401", 
+            description = "Недействительный refresh токен"
+        ),
+        @ApiResponse(
+            responseCode = "400", 
+            description = "Некорректные данные запроса"
+        )
+    })
+    public ResponseEntity<AuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        try {
+            // Проверяем, что это refresh токен
+            if (!jwtService.isRefreshToken(request.getRefreshToken())) {
+                log.warn("Invalid token type for refresh: not a refresh token");
+                return ResponseEntity.status(401).build();
+            }
+
+            // Проверяем, что токен не истек
+            if (jwtService.isTokenExpired(request.getRefreshToken())) {
+                log.warn("Refresh token expired");
+                return ResponseEntity.status(401).build();
+            }
+
+            // Парсим токен
+            var claims = jwtService.parse(request.getRefreshToken());
+            String username = claims.getSubject();
+            String sessionId = claims.get("sessionId", String.class);
+
+            // Проверяем, что сессия активна
+            if (!sessionService.isSessionActive(UUID.fromString(sessionId))) {
+                log.warn("Session is not active: sessionId={}", sessionId);
+                return ResponseEntity.status(401).build();
+            }
+
+            // Получаем информацию о пользователе
+            var userDetails = userDetailsService.loadUserByUsername(username);
+            String role = userDetails.getAuthorities().stream()
+                    .map(authority -> authority.getAuthority())
+                    .findFirst()
+                    .orElse("ROLE_USER");
+            if (role.startsWith("ROLE_")) role = role.substring(5);
+
+            // Генерируем новые токены
+            String newAccessToken = jwtService.generateAccessToken(username, role, sessionId);
+            String newRefreshToken = jwtService.generateRefreshToken(username, sessionId);
+
+            // Обновляем сессию с новым refresh токеном
+            sessionService.updateSessionToken(UUID.fromString(sessionId), newRefreshToken);
+
+            log.info("Token refreshed successfully: username={}, sessionId={}", username, sessionId);
+
+            return ResponseEntity.ok(new AuthResponse(newAccessToken, newRefreshToken, role, username));
+        } catch (Exception e) {
+            log.warn("Token refresh failed", e);
+            return ResponseEntity.status(401).build();
+        }
+    }
+
+    @PostMapping("/logout")
+    @Operation(
+        summary = "Выход из системы",
+        description = "Завершение сессии пользователя"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Успешный выход из системы"
+        ),
+        @ApiResponse(
+            responseCode = "401", 
+            description = "Недействительный токен"
+        )
+    })
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        try {
+            // Получаем токен из заголовка
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(401).build();
+            }
+            
+            String token = authHeader.substring(7);
+            
+            // Проверяем, что это access токен
+            if (!jwtService.isAccessToken(token)) {
+                return ResponseEntity.status(401).build();
+            }
+            
+            // Парсим токен
+            var claims = jwtService.parse(token);
+            String sessionId = claims.get("sessionId", String.class);
+            
+            // Получаем информацию о пользователе
+            String username = claims.getSubject();
+            UUID userId = getUserIdByUsername(username);
+            
+            // Завершаем сессию
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = getClientIpAddress(request);
+            sessionService.logout(UUID.fromString(sessionId), userId, ipAddress, userAgent);
+            
+            log.info("User logged out: username={}, sessionId={}", username, sessionId);
+            
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.warn("Logout failed", e);
+            return ResponseEntity.status(401).build();
+        }
+    }
+
+    @PostMapping("/logout-all")
+    @Operation(
+        summary = "Выход со всех устройств",
+        description = "Завершение всех активных сессий пользователя"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200", 
+            description = "Успешный выход со всех устройств"
+        ),
+        @ApiResponse(
+            responseCode = "401", 
+            description = "Недействительный токен"
+        )
+    })
+    public ResponseEntity<Void> logoutAll(HttpServletRequest request) {
+        try {
+            // Получаем токен из заголовка
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(401).build();
+            }
+            
+            String token = authHeader.substring(7);
+            
+            // Проверяем, что это access токен
+            if (!jwtService.isAccessToken(token)) {
+                return ResponseEntity.status(401).build();
+            }
+            
+            // Парсим токен
+            var claims = jwtService.parse(token);
+            String sessionId = claims.get("sessionId", String.class);
+            
+            // Получаем информацию о пользователе
+            String username = claims.getSubject();
+            UUID userId = getUserIdByUsername(username);
+            
+            // Завершаем все сессии кроме текущей
+            String userAgent = request.getHeader("User-Agent");
+            String ipAddress = getClientIpAddress(request);
+            sessionService.terminateAllOtherSessions(UUID.fromString(sessionId), userId, ipAddress, userAgent);
+            
+            log.info("User logged out from all devices: username={}, currentSessionId={}", username, sessionId);
+            
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.warn("Logout all failed", e);
+            return ResponseEntity.status(401).build();
         }
     }
 
