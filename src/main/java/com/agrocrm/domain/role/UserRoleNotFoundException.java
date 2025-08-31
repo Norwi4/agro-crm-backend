@@ -14,3 +14,4 @@ public class UserRoleNotFoundException extends RuntimeException {
         super(message, cause);
     }
 }
+

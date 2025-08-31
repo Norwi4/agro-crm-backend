@@ -14,3 +14,4 @@ public class PersonalDocumentNotFoundException extends RuntimeException {
         super(message, cause);
     }
 }
+

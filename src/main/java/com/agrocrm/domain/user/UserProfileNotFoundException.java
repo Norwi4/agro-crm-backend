@@ -16,3 +16,4 @@ public class UserProfileNotFoundException extends RuntimeException {
         super(message, cause);
     }
 }
+

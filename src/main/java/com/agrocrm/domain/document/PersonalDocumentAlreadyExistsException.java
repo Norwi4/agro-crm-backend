@@ -10,3 +10,4 @@ public class PersonalDocumentAlreadyExistsException extends RuntimeException {
         super(message, cause);
     }
 }
+

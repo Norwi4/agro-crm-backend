@@ -156,3 +156,4 @@ public class CompanyDocument {
         return !LocalDate.now().isAfter(expiresAt) && !expiresAt.isAfter(thirtyDaysFromNow);
     }
 }
+

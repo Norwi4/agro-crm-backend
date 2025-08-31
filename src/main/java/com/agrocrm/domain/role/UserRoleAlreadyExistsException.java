@@ -10,3 +10,4 @@ public class UserRoleAlreadyExistsException extends RuntimeException {
         super(message, cause);
     }
 }
+

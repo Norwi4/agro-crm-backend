@@ -11,9 +11,12 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -196,6 +199,64 @@ public class CompanyDocumentController {
         }
     }
 
+    @PostMapping(value = "/with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Operation(summary = "Создать новый общий документ с файлом", description = "Создает новый общий документ предприятия с загруженным PDF файлом")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Документ создан успешно"),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные или файл"),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
+    })
+    public ResponseEntity<CompanyDocument> createWithFile(
+            @Parameter(description = "Название документа") @RequestParam("title") String title,
+            @Parameter(description = "Описание документа") @RequestParam(value = "description", required = false) String description,
+            @Parameter(description = "Тип документа") @RequestParam("documentType") String documentType,
+            @Parameter(description = "Статус документа") @RequestParam("status") String status,
+            @Parameter(description = "ID департамента") @RequestParam(value = "departmentId", required = false) Integer departmentId,
+            @Parameter(description = "PDF файл") @RequestParam("file") MultipartFile file) {
+        try {
+            UUID userId = sec.currentUserIdOrNull();
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            // Проверяем тип файла
+            if (!file.getContentType().equals("application/pdf")) {
+                log.warn("Invalid file type: {}", file.getContentType());
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Создаем документ
+            CompanyDocument document = new CompanyDocument();
+            document.setTitle(title);
+            document.setDescription(description);
+            document.setDocumentType(documentType);
+            document.setStatus(status);
+            document.setDepartmentId(departmentId);
+            document.setCreatedBy(userId);
+            
+            UUID id = service.create(document);
+            
+            // Генерируем имя файла
+            String fileName = id.toString() + ".pdf";
+            
+            // Загружаем файл
+            service.uploadDocumentFile(id, fileName, file.getBytes(), file.getContentType());
+            
+            // Получаем созданный документ
+            CompanyDocument createdDocument = service.get(id);
+            
+            auditService.log(userId, "COMPANY_DOCUMENT_CREATED_WITH_FILE", "company_document", id.toString(), 
+                           "Created company document with file: " + title);
+            
+            log.info("Created company document with file: id={}, title={}, file={}", id, title, fileName);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdDocument);
+        } catch (Exception e) {
+            log.error("Failed to create company document with file: title={}", title, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     @Operation(summary = "Обновить общий документ", description = "Обновляет существующий общий документ")
@@ -259,4 +320,100 @@ public class CompanyDocumentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+        @GetMapping("/{id}/download")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('AGRONOM')")
+    @Operation(summary = "Скачать PDF документ", description = "Генерирует PDF из данных документа, сохраняет файл и отправляет на скачивание")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "PDF файл успешно сгенерирован и скачан"),
+        @ApiResponse(responseCode = "404", description = "Документ не найден"),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
+    })
+    public ResponseEntity<byte[]> downloadDocument(
+            @Parameter(description = "ID документа") @PathVariable UUID id) {
+        try {
+            UUID userId = sec.currentUserIdOrNull();
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            CompanyDocument document = service.get(id);
+            
+            // Генерируем PDF, сохраняем файл и получаем содержимое
+            byte[] pdfContent = service.generateAndSaveDocumentPdf(id);
+            
+            // Настраиваем заголовки для скачивания
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            
+            // Используем безопасное имя файла только с ASCII символами
+            String safeFileName = document.getId().toString() + ".pdf";
+            headers.set("Content-Disposition", "attachment; filename=\"" + safeFileName + "\"");
+            headers.setContentLength(pdfContent.length);
+            
+            auditService.log(userId, "COMPANY_DOCUMENT_PDF_GENERATED", "company_document", id.toString(), 
+                           "Generated and downloaded PDF for company document: " + document.getTitle());
+            
+            log.info("Generated and downloaded PDF for company document: id={}, title={}", id, document.getTitle());
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfContent);
+        } catch (CompanyDocumentNotFoundException e) {
+            log.warn("Company document not found for PDF generation: id={}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for company document: id={}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/{id}/upload")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Operation(summary = "Загрузить файл для документа", description = "Загружает PDF файл для существующего документа")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Файл успешно загружен"),
+        @ApiResponse(responseCode = "404", description = "Документ не найден"),
+        @ApiResponse(responseCode = "400", description = "Некорректный файл"),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав для доступа")
+    })
+    public ResponseEntity<CompanyDocument> uploadFile(
+            @Parameter(description = "ID документа") @PathVariable UUID id,
+            @Parameter(description = "PDF файл") @RequestParam("file") MultipartFile file) {
+        try {
+            UUID userId = sec.currentUserIdOrNull();
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            // Проверяем тип файла
+            if (!file.getContentType().equals("application/pdf")) {
+                log.warn("Invalid file type: {}", file.getContentType());
+                return ResponseEntity.badRequest().build();
+            }
+            
+            CompanyDocument document = service.get(id);
+            
+            // Генерируем имя файла
+            String fileName = id.toString() + ".pdf";
+            
+            // Сохраняем файл
+            service.uploadDocumentFile(id, fileName, file.getBytes(), file.getContentType());
+            
+            // Получаем обновленный документ
+            CompanyDocument updatedDocument = service.get(id);
+            
+            auditService.log(userId, "COMPANY_DOCUMENT_FILE_UPLOADED", "company_document", id.toString(), 
+                           "Uploaded file for company document: " + document.getTitle());
+            
+            log.info("Uploaded file for company document: id={}, title={}, file={}", id, document.getTitle(), fileName);
+            return ResponseEntity.ok(updatedDocument);
+        } catch (CompanyDocumentNotFoundException e) {
+            log.warn("Company document not found for file upload: id={}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Failed to upload file for company document: id={}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
+
